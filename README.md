@@ -1,5 +1,5 @@
-## backpropagation-feedforward-ANN
-    Creating feedforward neural network trained using basic backpropagation algorithm from scratch
+# backpropagation-feedforward-ANN
+    Creating feedforward neural network which trained using basic backpropagation algorithm from scratch
 
-# scripts
+## scripts
 -`FF_ANN_backpropagation.py`: implementation of the network and algorithm
