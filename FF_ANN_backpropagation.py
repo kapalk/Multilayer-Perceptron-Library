@@ -204,13 +204,14 @@ class FF_ANN_backpropagation:
             predictions_prob = list()
             for row in data:
                 output = feedforward(self.network,row, self.activation)
+                print(output)
                 if self.activation == 'logistic':
-                    predictions_prob.append([output[i]/sum(output) 
+                    predictions_prob.append([output[i] / sum(output)
                     for i in range(self.n_output)])
                 if self.activation == 'tanh':
                     predictions_prob.append([abs(output[i])/sum(map(abs,output)) 
                     for i in range(self.n_output)])
-                predictions.append(output.index(max(output)))
+                predictions.append(output.index(max(map(abs,output))))
             self.predicted = predictions
             self.predicted_prob = predictions_prob
             if pred_prob == False:
