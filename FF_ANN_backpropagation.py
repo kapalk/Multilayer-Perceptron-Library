@@ -8,22 +8,29 @@ Created on Tue Mar 28 18:16:14 2017
 from random import random, seed
 from math import exp
 
-def activation(x):
+def activation(x,function):
     '''logistic function as activation function
     '''
-    return 1.0 / (1.0 + exp(-x))
+    logistic = 1.0 / (1.0 + exp(-x))
+    tanh = (exp(2*x)-1) / (exp(2*x)+1)
+    functions = {'logistic': logistic , 'tanh': tanh}
+    try:
+        return functions[function]
+    except KeyError:
+        print('Current activation function is not supported')
+        
 
 def sigma(neuron,inputs,bias):
     return sum([inputs[i]*neuron['weights'][i] \
                       for i in range(len(inputs))]) + bias
 
-def neuronOutput(layer,inputs):
+def neuronOutput(layer,inputs,activation_func):
     '''computes the output from each neuron 
     
     -Parameters:
         layer: layer of the network as list.
         inputs: list of inputs for the layer.
-    
+        activation_func: activation function as string
     -Returns:
         output of the layer as list.
     '''
@@ -31,38 +38,43 @@ def neuronOutput(layer,inputs):
     for neuron in layer:
         bias = neuron['weights'][-1]
         output = sigma(neuron, inputs, bias)
-        activated_output = activation(output)
+        activated_output = activation(output,activation_func)
         neuron['output'] = activated_output
         activated_outputs.append(activated_output)
     return activated_outputs
 
-def feedforward(network,inputs):
+def feedforward(network,inputs, activation_func):
     '''feedforward for network
     
     -Parameters:
         layer: network weights as list of dictionaries.
         inputs: list of inputs for the layer.
+        activation_func: activation function as string
     
     -Returns:
         output of the whole network.
     '''
     new_inputs = inputs
     for layer in network:
-        new_inputs = neuronOutput(layer,new_inputs)
+        new_inputs = neuronOutput(layer,new_inputs,activation_func)
     return new_inputs
 
-def derivativeActivation(x):
+def derivativeActivation(x, function):
     '''derivative of logistic function
     '''
-    return x * (1.0 - x)
+    logistic_derivative = x * (1.0 - x)
+    tanh_derivative = 4 /((exp(-x) + exp(x))**2)
+    functions = {'logistic': logistic_derivative, 'tanh': tanh_derivative}
+    return functions[function]
     
-def backpropagate(network, desired_outputs):
+def backpropagate(network, desired_outputs, activation_func):
     '''Backpropagates through network and stores backpropagation error for
        each neuron.
        
     -Parameters:
         network: forward propagated network.
         desired _outputs: learning target as list.
+        activation_func: activation function as string
     '''
     
     for i in reversed(range(len(network))):
@@ -81,7 +93,8 @@ def backpropagate(network, desired_outputs):
                 cost = desired_outputs[j] - neuron['output']
                 costs.append(cost)
         for j, neuron in enumerate(layer):
-            neuron['error'] = costs[j]*derivativeActivation(neuron['output'])
+            neuron['error'] = costs[j]*derivativeActivation(neuron['output'],
+                                                          activation_func)
 
     
 def updateWeights(network, rate, input_list):
@@ -114,7 +127,8 @@ def errorCalc(desired_outputs, outputs):
 class FF_ANN_backpropagation:
     
     
-    def __init__(self,n_input, n_hidden_neuron, n_hidden_layer, n_output=2):
+    def __init__(self,n_input, n_hidden_neuron, n_hidden_layer, n_output=2,
+                 activation = 'logistic'):
         '''initializes the network
         
         -Parameters: 
@@ -127,11 +141,12 @@ class FF_ANN_backpropagation:
         seed(1)
         self.trained = False
         self.predicted = None
+        self.predicted_prob = None
         self.n_input = n_input
         self.n_output = n_output
         self.n_hidden_neuron = n_hidden_neuron
         self.n_hidden_layer = n_hidden_layer
-        
+        self.activation = activation
         network = list()
         for i in range(self.n_hidden_layer):
             if i == 0:
@@ -163,9 +178,9 @@ class FF_ANN_backpropagation:
             for row in data:
                 desired_output = [0 for i in range(self.n_output)]
                 desired_output[int(row[-1])] = 1
-                outputs = feedforward(self.network,inputs=row)
+                outputs = feedforward(self.network,row,self.activation)
                 error_sum += errorCalc(desired_output,outputs)
-                backpropagate(self.network, desired_output)
+                backpropagate(self.network, desired_output, self.activation)
                 updateWeights(self.network, rate, row)
             if print_learning:
                 print('epoch=%d, error=%.3f' % (epoch, error_sum))
@@ -186,14 +201,22 @@ class FF_ANN_backpropagation:
         '''
         if self.trained:
             predictions = list()
+            predictions_prob = list()
             for row in data:
-                output = feedforward(self.network,row)
-                if pred_prob:
-                    predictions.append([output[i]/sum(output) for i in range(self.n_output)])
-                else:
-                    predictions.append(output.index(max(output)))
+                output = feedforward(self.network,row, self.activation)
+                if self.activation == 'logistic':
+                    predictions_prob.append([output[i]/sum(output) 
+                    for i in range(self.n_output)])
+                if self.activation == 'tanh':
+                    predictions_prob.append([abs(output[i])/sum(map(abs,output)) 
+                    for i in range(self.n_output)])
+                predictions.append(output.index(max(output)))
             self.predicted = predictions
-            return predictions
+            self.predicted_prob = predictions_prob
+            if pred_prob == False:
+                return predictions
+            else:
+                return predictions_prob
         else:
             raise Exception('Network is not trained!')
             
