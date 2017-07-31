@@ -8,6 +8,29 @@ Created on Tue Mar 28 18:16:14 2017
 from random import uniform, seed
 from math import exp
 
+def initialize(n_input, n_hidden_neuron, n_hidden_layer, n_output):
+    seed(1)
+    network = list()
+    for i in range(n_hidden_layer):
+        if i == 0:
+            left_bound = -0.5 / n_input # common way to initilize weights
+            rigth_bound = 0.5 / n_input
+            hiddenLayer = [{'weights': [uniform(left_bound,rigth_bound) \
+                            for j in range(n_input+1)]} \
+                           for j in range(n_hidden_neuron)]
+        else:
+            left_bound = -0.5 / n_hidden_neuron
+            rigth_bound = 0.5 / n_hidden_neuron
+            hiddenLayer = [{'weights': [uniform(left_bound,rigth_bound) \
+                            for j in range(n_hidden_neuron+1)]} \
+                           for j in range(n_hidden_neuron)]
+        network.append(hiddenLayer)
+    outputLayer = [{'weights': [uniform(left_bound,rigth_bound) \
+                               for j in range(n_hidden_neuron+1)]}\
+                  for j in range(n_output)]
+    network.append(outputLayer)
+    return network
+
 def activation(x,function):
     '''returns activation function according to user input
     '''
@@ -25,8 +48,8 @@ def summing_junction(neuron,inputs,bias):
     return sum([inputs[i]*neuron['weights'][i] \
                       for i in range(len(inputs))]) + bias
 
-def neuronOutput(layer,inputs,activation_func):
-    '''computes the output from each neuron
+def neuronOutput(layer,inputs,activation_func, regression, output_layer):
+    '''computes the output from each neuron. If regression, output layer is linear
 
     -Parameters:
         layer: layer of the network as list.
@@ -36,15 +59,18 @@ def neuronOutput(layer,inputs,activation_func):
         output of the layer as list.
     '''
     outputs = list()
-    for neuron in layer:
+    for i,neuron in enumerate(layer):
         bias = neuron['weights'][-1]
         lin_response = summing_junction(neuron, inputs, bias)
-        output = activation(lin_response,activation_func)
+        if regression and output_layer:
+            output = lin_response
+        else:
+            output = activation(lin_response,activation_func)
         neuron['output'] = output
         outputs.append(output)
     return outputs
 
-def feedforward(network,inputs, activation_func):
+def feedforward(network,inputs, activation_func, regression = False):
     '''feedforward for network
 
     -Parameters:
@@ -56,9 +82,16 @@ def feedforward(network,inputs, activation_func):
         output of the whole network.
     '''
     new_inputs = inputs
-    for layer in network:
-        new_inputs = neuronOutput(layer,new_inputs,activation_func)
-    return new_inputs
+    output_layer = False
+    for i, layer in enumerate(network):
+        if i+1 == len(network):
+            output_layer = True
+        new_inputs = neuronOutput(layer,new_inputs,activation_func, 
+                                  regression, output_layer)
+    if regression:
+        return new_inputs[0]
+    else:
+        return new_inputs
 
 def derivativeActivation(x, function):
     '''derivative of logistic function
@@ -125,6 +158,44 @@ def errorCalc(desired_outputs, outputs):
                  for i in range(len(desired_outputs))])
 
 
+def trainPredictor(network, data, learning_rate_init, 
+                   n_epochs, n_output, activation = 'logistic', 
+                   learning_rate = 'constant', print_learning = False, 
+                   regression = False):
+    '''training of the network
+
+        -Parameters:
+            network: initialized network.
+            data: learning data where targets are in the last column.
+            learning_rate_init: initial learning rate.
+            n_epochs: the number of epochs.
+            n_outputs: the number of outputs
+            activation: chosen activation function
+            learning_rate: learning rate adjusting method
+            print_learning: is learning printed 
+            regression: is network for regression or classification
+    '''
+    iter = 1
+    for epoch in range(n_epochs):
+        error_sum = 0
+        for row in data:
+            iter += 1
+            desired_response = [0 for i in range(n_output)]
+            desired_response[int(row[-1])] = 1
+            outputs = feedforward(network,row,activation,
+                                  regression=regression)
+            error_sum += errorCalc(desired_response,outputs)
+            backpropagate(network, desired_response, activation)
+            if learning_rate == 'decreasive':
+                rate = learning_rate_init / (1 + iter / 100)
+            else:
+                rate = learning_rate_init
+            updateWeights(network, rate, row)
+        if print_learning:
+            print('epoch=%d, error=%.3f' % (epoch, error_sum))
+    return network, True
+
+
 class MLP_classifier:
 
 
@@ -137,6 +208,7 @@ class MLP_classifier:
             n_hidden: the number of neurons in hidden layers.
             n_hidden_layer: the number of hidden layers.
             n_outputs: the number of outputs.
+            activation: activation function on each neuron.
 
         '''
         seed(1)
@@ -148,58 +220,27 @@ class MLP_classifier:
         self.n_hidden_neuron = n_hidden_neuron
         self.n_hidden_layer = n_hidden_layer
         self.activation = activation
-        network = list()
-        for i in range(self.n_hidden_layer):
-            if i == 0:
-                left_bound = -0.5 / n_input # common way to initilize weights
-                rigth_bound = 0.5 / n_input
-                hiddenLayer = [{'weights': [uniform(left_bound,rigth_bound) \
-                                for j in range(self.n_input+1)]} \
-                               for j in range(self.n_hidden_neuron)]
-            else:
-                left_bound = -0.5 / n_hidden_neuron
-                rigth_bound = 0.5 / n_hidden_neuron
-                hiddenLayer = [{'weights': [uniform(left_bound,rigth_bound) \
-                                for j in range(self.n_hidden_neuron+1)]} \
-                               for j in range(self.n_hidden_neuron)]
-            network.append(hiddenLayer)
-        outputLyer = [{'weights': [uniform(left_bound,rigth_bound) \
-                                   for j in range(self.n_hidden_neuron+1)]}\
-                      for j in range(self.n_output)]
-        network.append(outputLyer)
-        self.network = network
-
+        self.network = initialize(n_input, n_hidden_layer, n_hidden_neuron,
+                                  n_output)    
 
     def train(self, data, learning_rate_init, n_epochs, learning_rate = 'constant',
      print_learning = False):
         '''training of the network
 
         -Parameters:
-            network: initialized network.
-            date: learning data where targets are in the last column.
-            rate: learning rate.
+            data: learning data where targets are in the last column.
+            learning_rate_init: initial learning rate.
             n_epochs: the number of epochs.
-            n_outputs: the number of outputs.
-
+            learning_rate: learning rate adjusting method
+            print_learning: is learning printed 
         '''
-        iter = 1
-        for epoch in range(n_epochs):
-            error_sum = 0
-            for row in data:
-                iter += 1
-                desired_response = [0 for i in range(self.n_output)]
-                desired_response[int(row[-1])] = 1
-                outputs = feedforward(self.network,row,self.activation)
-                error_sum += errorCalc(desired_response,outputs)
-                backpropagate(self.network, desired_response, self.activation)
-                if learning_rate == 'decreasive':
-                    rate = learning_rate_init / (1 + iter / 100)
-                else:
-                    rate = learning_rate_init
-                updateWeights(self.network, rate, row)
-            if print_learning:
-                print('epoch=%d, error=%.3f' % (epoch, error_sum))
-        self.trained = True
+        self.network, self.trained = trainPredictor(self.network, data, 
+                                                    learning_rate_init, 
+                                                    n_epochs, self.n_output, 
+                                                    self.activation, 
+                                                    learning_rate, 
+                                                    print_learning,
+                                                    regression=True)
 
 
     def predict(self, data, pred_prob = False):
@@ -242,3 +283,78 @@ class MLP_classifier:
             if true == pred:
                 n_equal += 1
         return n_equal / len(trueClasses)
+
+class MLP_regressor:
+    
+    def __init__(self,n_input, n_hidden_neuron, n_hidden_layer, activation):
+        '''initializes the network
+
+        -Parameters:
+            n_input: the number of inputs.
+            n_hidden: the number of neurons in hidden layers.
+            n_hidden_layer: the number of hidden layers.
+            activation: activation function on each neuron.
+        '''
+        seed(1)
+        self.trained = False
+        self.predicted = None
+        self.predicted_prob = None
+        self.n_input = n_input
+        self.n_hidden_neuron = n_hidden_neuron
+        self.n_hidden_layer = n_hidden_layer
+        self.n_output = 1
+        self.activation = activation
+        self.network = initialize(n_input, n_hidden_layer, n_hidden_neuron, 1)
+        
+    def train(self, data, learning_rate_init, n_epochs, learning_rate = 'constant',
+     print_learning = False):
+        '''training of the network
+
+        -Parameters:
+            network: initialized network.
+            date: learning data where targets are in the last column.
+            rate: learning rate.
+            n_epochs: the number of epochs.
+
+        '''
+        self.network, self.trained = trainPredictor(self.network, data, 
+                                                    learning_rate_init, 
+                                                    n_epochs, self.n_output, 
+                                                    self.activation, 
+                                                    learning_rate, 
+                                                    print_learning)
+    
+    def predict(self, data, pred_prob = False):
+        '''Predicts targets
+
+        -Parameters:
+            network: trained network.
+            data: features.
+            n_output: the number of classes:
+            pred_prob: whether to predict crips classes or probabilites
+
+        -Returns:
+            list of predictions.
+        '''
+        if self.trained:
+            predictions = list()
+            for row in data:
+                output = feedforward(self.network,row, self.activation,
+                                     regression=True)
+                print(output)
+                predictions.append(output)
+            self.predicted = predictions
+            return predictions
+        else:
+            raise Exception('Network is not trained!')
+    
+    def score_mse(self,trueValues):
+        '''prediction performance as mean squared error
+        '''
+        n_samples = len(trueValues)
+        total_squared_error = 0
+        for true, predicted in zip(trueValues, self.predicted):
+            total_squared_error += (true-predicted)**2
+        return 1/n_samples * total_squared_error
+        
+        
