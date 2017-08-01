@@ -117,23 +117,23 @@ def backpropagate(network, desired_outputs, activation_func):
         if i != len(network)-1:
             for j in range(len(layer)):
                 cost = 0.0
-                inputLayer = network[i+1]
-                for neuron in inputLayer:
-                    cost += neuron['weights'][j] * neuron['error']
+                outerLayer = network[i+1]
+                for neuron in outerLayer:
+                    cost += neuron['weights'][j] * neuron['delta']
                 costs.append(cost)
 
         else:
-            for j, neuron in enumerate(layer):
-                cost = desired_outputs[j] - neuron['output']
+            for desired_output, neuron in zip(desired_outputs, layer):
+                cost = desired_output - neuron['output']
                 costs.append(cost)
-        for j, neuron in enumerate(layer):
-            neuron['error'] = costs[j]*derivativeActivation(neuron['output'],
+        for neuron, cost in zip(layer, costs):
+            neuron['delta'] = cost*derivativeActivation(neuron['output'],
                                                           activation_func)
 
 
 def updateWeights(network, rate, input_list):
     '''Updates weights according in following:
-        weight = weight + learning_rate * error * input
+        weight = weight + learning_rate * delta * input
 
     -Parameters:
         network: backpropagated network.
@@ -141,15 +141,15 @@ def updateWeights(network, rate, input_list):
         input_list: training data instance as list
 
     '''
-    for ix,layer in enumerate(network):
-        if ix == 0:
-            inputs = input_list[:-1]
+    for i,layer in enumerate(network):
+        if i == 0:
+            inputs = input_list#[:-1]
         else:
-            inputs = [neuron['output'] for neuron in network[ix-1]]
+            inputs = [neuron['output'] for neuron in network[i-1]]
         for neuron in layer:
-            for i in range(len(inputs)):
-                neuron['weights'][i] += rate * neuron['error']*inputs[i]
-            neuron['weights'][-1] +=  rate * neuron['error']
+            for j in range(len(inputs)):
+                neuron['weights'][j] += rate * neuron['delta']*inputs[j]
+            neuron['weights'][-1] +=  rate * neuron['delta']
 
 def errorCalc(desired_outputs, outputs):
     '''computes training error for single training sample
@@ -160,8 +160,7 @@ def errorCalc(desired_outputs, outputs):
 
 def trainPredictor(network, data, learning_rate_init, 
                    n_epochs, n_output, activation = 'logistic', 
-                   learning_rate = 'constant', print_learning = False, 
-                   regression = False):
+                   learning_rate = 'constant', print_learning = False):
     '''training of the network
 
         -Parameters:
@@ -173,8 +172,10 @@ def trainPredictor(network, data, learning_rate_init,
             activation: chosen activation function
             learning_rate: learning rate adjusting method
             print_learning: is learning printed 
-            regression: is network for regression or classification
     '''
+    regression = False
+    if n_output == 1:
+        regression = True
     iter = 1
     for epoch in range(n_epochs):
         error_sum = 0
@@ -195,6 +196,39 @@ def trainPredictor(network, data, learning_rate_init,
             print('epoch=%d, error=%.3f' % (epoch, error_sum))
     return network, True
 
+def predictValues(trained, network, data, n_output, activation, 
+                  pred_prob = False):
+    '''Predicts targets
+
+        -Parameters:
+            trained: boolean value
+            network: trained network.
+            data: features.
+            n_output: the number of outputs:
+            activation: activation function used
+            pred_prob: whether to predict crips classes or probabilites
+        -Returns:
+            list of predictions.
+    '''
+    if trained:
+        predictions = list()
+        predictions_prob = list()
+        for row in data:
+            output = feedforward(network, row, activation)
+            if n_output > 1:
+                if activation == 'logistic':
+                    predictions_prob.append([output[i] / sum(output)
+                    for i in range(n_output)])
+                if activation == 'tanh':
+                    predictions_prob.append([abs(output[i])/sum(map(abs,output))
+                    for i in range(n_output)])
+            predictions.append(output.index(max(map(abs,output))))
+        if not pred_prob:
+            return predictions
+        else:
+            return predictions_prob
+    else:
+        raise Exception('Network is not trained!')
 
 class MLP_classifier:
 
@@ -239,8 +273,7 @@ class MLP_classifier:
                                                     n_epochs, self.n_output, 
                                                     self.activation, 
                                                     learning_rate, 
-                                                    print_learning,
-                                                    regression=True)
+                                                    print_learning)
 
 
     def predict(self, data, pred_prob = False):
@@ -249,33 +282,22 @@ class MLP_classifier:
         -Parameters:
             network: trained network.
             data: features.
-            n_output: the number of classes:
             pred_prob: whether to predict crips classes or probabilites
-
         -Returns:
             list of predictions.
         '''
-        if self.trained:
-            predictions = list()
-            predictions_prob = list()
-            for row in data:
-                output = feedforward(self.network,row, self.activation)
-                print(output)
-                if self.activation == 'logistic':
-                    predictions_prob.append([output[i] / sum(output)
-                    for i in range(self.n_output)])
-                if self.activation == 'tanh':
-                    predictions_prob.append([abs(output[i])/sum(map(abs,output))
-                    for i in range(self.n_output)])
-                predictions.append(output.index(max(map(abs,output))))
-            self.predicted = predictions
-            self.predicted_prob = predictions_prob
-            if pred_prob == False:
-                return predictions
-            else:
-                return predictions_prob
+        if pred_prob:
+            self.predictions = predictValues(self.trained, self.network, 
+                                             data, self.n_output, 
+                                             self.activation, pred_prob)
+            return self.predictions
         else:
-            raise Exception('Network is not trained!')
+            self.predicted_prob = predictValues(self.trained, self.network, 
+                                                data, self.n_output, 
+                                                self.activation, pred_prob)
+            return self.predicted_prob
+    
+       
 
     def score(self,trueClasses):
         n_equal = 0
@@ -297,8 +319,7 @@ class MLP_regressor:
         '''
         seed(1)
         self.trained = False
-        self.predicted = None
-        self.predicted_prob = None
+        self.predictions = None
         self.n_input = n_input
         self.n_hidden_neuron = n_hidden_neuron
         self.n_hidden_layer = n_hidden_layer
@@ -324,36 +345,27 @@ class MLP_regressor:
                                                     learning_rate, 
                                                     print_learning)
     
-    def predict(self, data, pred_prob = False):
+    def predict(self, data):
         '''Predicts targets
 
         -Parameters:
             network: trained network.
             data: features.
-            n_output: the number of classes:
-            pred_prob: whether to predict crips classes or probabilites
-
         -Returns:
             list of predictions.
         '''
-        if self.trained:
-            predictions = list()
-            for row in data:
-                output = feedforward(self.network,row, self.activation,
-                                     regression=True)
-                print(output)
-                predictions.append(output)
-            self.predicted = predictions
-            return predictions
-        else:
-            raise Exception('Network is not trained!')
+        self.predictions = predictValues(self.trained, self.network, 
+                                             data, self.n_output, 
+                                             self.activation, 
+                                             pred_prob=False)
+        return self.predictions
     
     def score_mse(self,trueValues):
         '''prediction performance as mean squared error
         '''
         n_samples = len(trueValues)
         total_squared_error = 0
-        for true, predicted in zip(trueValues, self.predicted):
+        for true, predicted in zip(trueValues, self.predictions):
             total_squared_error += (true-predicted)**2
         return 1/n_samples * total_squared_error
         
