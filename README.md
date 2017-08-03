@@ -1,6 +1,7 @@
 # backpropagation-feedforward-ANN
-    A feedforward neural network binary classifier which is trained using basic backpropagation algorithm.
-    The whole network and algorithm are built from scratch using python 3.5 without any external library 
+    A multi-layer perceptron library. The library contains a MLP class for binary classifying and another for regression. The network is trained by neural basic backpropagation algorithm. User can define the number of hidden layers and hidden neurons of the network and choose between a few activation functions.
+
+    The whole network and algorithm are built from scratch using python 3 without any external library 
     dependencies.
 
 ## scripts:
@@ -8,5 +9,3 @@
 
 ## TODO:
 - Extension to multiclass classifier
-- different activation functions
-- Version for regression
