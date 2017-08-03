@@ -101,7 +101,7 @@ def derivativeActivation(x, function):
     functions = {'logistic': logistic_derivative, 'tanh': tanh_derivative}
     return functions[function]
 
-def backpropagate(network, desired_outputs, activation_func):
+def backpropagate(network, desired_outputs, activation_func, regression):
     '''Backpropagates through network and stores backpropagation error for
        each neuron.
 
@@ -127,7 +127,10 @@ def backpropagate(network, desired_outputs, activation_func):
                 cost = desired_output - neuron['output']
                 costs.append(cost)
         for neuron, cost in zip(layer, costs):
-            neuron['delta'] = cost*derivativeActivation(neuron['output'],
+            if regression and i==len(network)-1:
+                neuron['delta'] = cost
+            else:
+                neuron['delta'] = cost*derivativeActivation(neuron['output'],
                                                           activation_func)
 
 
@@ -143,17 +146,20 @@ def updateWeights(network, rate, input_list):
     '''
     for i,layer in enumerate(network):
         if i == 0:
-            inputs = input_list#[:-1]
+            inputs = input_list[:-1]
         else:
             inputs = [neuron['output'] for neuron in network[i-1]]
         for neuron in layer:
+#            inputs = [inputs[0] for i in range(len(neuron['weights'])-1)]
             for j in range(len(inputs)):
                 neuron['weights'][j] += rate * neuron['delta']*inputs[j]
             neuron['weights'][-1] +=  rate * neuron['delta']
 
-def errorCalc(desired_outputs, outputs):
+def errorCalc(desired_outputs, outputs, regression = False):
     '''computes training error for single training sample
     '''
+    if regression:
+        outputs = [outputs]
     return sum([(desired_outputs[i]-outputs[i])**2 \
                  for i in range(len(desired_outputs))])
 
@@ -176,19 +182,22 @@ def trainPredictor(network, data, learning_rate_init,
     regression = False
     if n_output == 1:
         regression = True
-    iter = 1
+    iter_count = 1
     for epoch in range(n_epochs):
         error_sum = 0
         for row in data:
-            iter += 1
-            desired_response = [0 for i in range(n_output)]
-            desired_response[int(row[-1])] = 1
+            iter_count += 1
+            if regression:
+                desired_response = [row[-1]]
+            else:
+                desired_response = [0 for i in range(n_output)]
+                desired_response[int(row[-1])] = 1
             outputs = feedforward(network,row,activation,
                                   regression=regression)
-            error_sum += errorCalc(desired_response,outputs)
-            backpropagate(network, desired_response, activation)
+            error_sum += errorCalc(desired_response, outputs, regression)
+            backpropagate(network, desired_response, activation, regression)
             if learning_rate == 'decreasive':
-                rate = learning_rate_init / (1 + iter / 100)
+                rate = learning_rate_init / (1 + iter_count / 100)
             else:
                 rate = learning_rate_init
             updateWeights(network, rate, row)

@@ -55,46 +55,65 @@ class tests(unittest.TestCase):
     
     
     def test_feedForward(self):
+        #classification
         network = [[{'weights': [0.34, 0.12, 0.53]}],
 		[{'weights': [0.78, 0.91]}, {'weights': [0.11, 0.31]}]]
-        #classification
         output = feedforward(network,[1, 2],'logistic')
         expected_output = [0.817075904219318, 0.596940729186586]
         self.AssertListAlmostEqual(expected_output, output, 
                                    'feedforward error in classification')
         #regression
-        network = [[{'weights': [0.34, 0.12, 0.53]}],
-		[{'weights': [0.78, 0.91]}, {'weights': [0.11, 0.31]}],
-        [{'weights': [0.87, 0.64, 0.11]}]]
+        network = [[{'weights': [0.34, 0.12, 0.53]}], 
+                   [{'weights': [0.78, 0.91]}]]
         output = feedforward(network,[1, 2],'logistic',regression=True)
-        expected_output = 1.20289810335022
+        expected_output = 1.496660706922860
         self.assertAlmostEqual(output, expected_output, 
                                msg='feedforward error in regression')
     
     
     def test_backpropagation(self):
+        #classification
         network = [[{'weights': [0.34, 0.12, 0.53], 'output': 0.7521291114395702}],
                    [{'weights': [0.78, 0.91], 'output': 0.8170759042193183},
                      {'weights': [0.11, 0.31], 'output': 0.5969407291865862}]]
-        backpropagate(network, [0, 1], activation_func='logistic')
+        backpropagate(network, [0, 1], 'logistic', False)
         delta_1 = network[0][0]['delta']
         delta_2 = network[1][0]['delta']
         delta_3 = network[1][1]['delta']
         self.assertAlmostEqual(delta_1, -0.0157698329885735, 
-                               msg='error in computing hidden layer delta')
+                               msg='clf:error in computing hidden layer delta')
         self.assertAlmostEqual(delta_2, -0.122122510439718, 
-                               msg='error in computing output layer delta')
+                               msg='clf:error in computing output layer delta')
         self.assertAlmostEqual(delta_3, 0.096977066200573, 
-                               msg='error in computing output layer delta')
-    
+                               msg='clf:error in computing output layer delta')
+        #regression
+        network = [[{'output': 0.7521291114395702, 
+                     'weights': [0.34, 0.12, 0.53]}], 
+                    [{'output': 1.4966607069228648, 
+                      'weights': [0.78, 0.91]}]]
+        backpropagate(network, [0.5], 'logistic', True)
+        delta_1 = network[0][0]['delta']
+        delta_2 = network[1][0]['delta']
+        self.assertAlmostEqual(delta_1, -0.1449305236966680, 
+                               msg='rgr:error in computing hidden layer delta')
+        self.assertAlmostEqual(delta_2, -0.996660706922865, 
+                               msg='rgr:error in computing output layer delta')
+        print(network)
+        
+        
     
     def test_updateWeights(self):
-        network = [[{'weights': [0.34, 0.12, 0.53], 'delta': -0.015769832988573537, 
-                     'output': 0.7521291114395702}], [{'weights': [0.78, 0.91], 
-                    'delta': -0.12212251043971845, 'output': 0.8170759042193183}, 
-                    {'weights': [0.11, 0.31], 'delta': 0.09697706620057299, 
+        #calssification
+        network = [[{'weights': [0.34, 0.12, 0.53], 
+                     'delta': -0.015769832988573537, 
+                     'output': 0.7521291114395702}], 
+                    [{'weights': [0.78, 0.91], 
+                    'delta': -0.12212251043971845, 
+                    'output': 0.8170759042193183}, 
+                    {'weights': [0.11, 0.31], 
+                     'delta': 0.09697706620057299, 
                      'output': 0.5969407291865862}]]
-        updateWeights(network,0.01,[1,2])
+        updateWeights(network,0.01,[1, 2, 1])
         expected_weights = [[0.339842301670114, 0.119684603340229, 0.529842301670114], 
                             [0.779081481047362, 0.908778774895603], 
                             [0.110729392746315, 0.310969770662006]]
@@ -104,7 +123,25 @@ class tests(unittest.TestCase):
         for weight, expected_weight in zip([weight_1, weight_2, weight_3],
                                            expected_weights):
             self.AssertListAlmostEqual(expected_weight, weight, 
-                                       'weight update error')
+                                       'clf: weight update error')
+        #regression
+        network = [[{'output': 0.7521291114395702, 
+                     'delta': -0.14493052369666767, 
+                     'weights': [0.34, 0.12, 0.53]}], 
+                    [{'output': 1.4966607069228648, 
+                      'delta': -0.9966607069228648, 
+                      'weights': [0.78, 0.91]}]]
+        updateWeights(network, 0.01, [1, 2, 0.5])
+        expected_weights = [[0.338550694763033, 0.117101389526067, 0.528550694763033], 
+                            [0.772503824680954, 0.900033392930771]]
+        weight_1 = network[0][0]['weights']
+        weight_2 = network[1][0]['weights']
+        for weight, expected_weight in zip([weight_1, weight_2],
+                                           expected_weights):
+            self.AssertListAlmostEqual(expected_weight, weight, 
+                                       'rgr: weight update error')
+#        print(network)
+        
        
                 
 if __name__ == "__main__":
