@@ -43,12 +43,12 @@ def activation(x, function_type):
     try:
         return functions[function_type]
     except KeyError:
-        print('Current activation function is not supported')
+        print('Current activation function is not supported, logistic is used')
+        return functions['logistic']
 
 
 def summing_junction(neuron, inputs, bias):
-    return sum([inputs[i] * neuron['weights'][i]
-                for i in range(len(inputs))]) + bias
+    return sum([inputs[i] * neuron['weights'][i] for i in range(len(neuron['weights'])-1)]) + bias
 
 
 def neuron_output(layer, inputs, activation_func, regression, output_layer):
@@ -83,11 +83,11 @@ def feed_forward(network, inputs, activation_func, regression=False):
     #    output of the whole network.
 
     new_inputs = inputs
-    output_layer = False
+    is_output_layer = False
     for i, layer in enumerate(network):
         if i + 1 == len(network):
-            output_layer = True
-        new_inputs = neuron_output(layer, new_inputs, activation_func, regression, output_layer)
+            is_output_layer = True
+        new_inputs = neuron_output(layer, new_inputs, activation_func, regression, is_output_layer)
     if regression:
         return new_inputs[0]
     else:
@@ -95,7 +95,7 @@ def feed_forward(network, inputs, activation_func, regression=False):
 
 
 def derivative_activation(x, function_type):
-    # Return derivative of logistic function
+    # Return derivative of activation function
 
     logistic_derivative = x * (1.0 - x)
     tanh_derivative = 4 / ((exp(-x) + exp(x)) ** 2)
@@ -118,7 +118,7 @@ def backpropagate(network, desired_outputs, activation_func, regression):
                 cost = 0.0
                 outer_layer = network[i + 1]
                 for neuron in outer_layer:
-                    cost += neuron['weights'][j] * neuron['delta']
+                    cost += (neuron['weights'][j] * neuron['delta'])
                 costs.append(cost)
 
         else:
@@ -243,13 +243,13 @@ class MlpClassifier:
         self.trained = False
         self.predicted = None
         self.predicted_prob = None
+        self.predictions = None
         self.n_input = n_input
         self.n_output = n_output
         self.n_hidden_neuron = n_hidden_neuron
         self.n_hidden_layer = n_hidden_layer
         self.activation = activation_func
         self.network = initialize(n_input, n_hidden_layer, n_hidden_neuron, n_output)
-        self.predictions = None
 
     def train(self, data, learning_rate_init, n_epochs, learning_rate='constant', print_learning=False):
         # Training of the network

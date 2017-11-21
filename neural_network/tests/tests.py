@@ -5,9 +5,7 @@ Created on Mon Jul 31 13:31:18 2017
 
 @author: kasperipalkama
 """
-import sys
-sys.path.append(os.path.abspath('..'))
-from feedforward_multilayer_perceptron.feedforward_multilayer_perceptron import initialize, feed_forward, backpropagate, update_weights
+from neural_network.multilayer_perceptron import initialize, feed_forward, backpropagate, update_weights
 import unittest
 
 
@@ -103,7 +101,7 @@ class Tests(unittest.TestCase):
         for weight, expected_weight in zip([weight_1, weight_2], expected_weights):
             self.assert_list_almost_equal(expected_weight, weight, 'rgr: weight update error')
         # print(network)
-        
+
 
 if __name__ == "__main__":
     unittest.main()
