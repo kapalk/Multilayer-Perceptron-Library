@@ -1,4 +1,4 @@
-# Artificial-Neural-Network-Library
+# Multi-Layer-Perceptron-Library
    ![mlp](https://user-images.githubusercontent.com/22057690/33873747-0ed65c20-ded1-11e7-921d-9d409770a39a.jpg)
     
 ## A multi-layer perceptron library. 
