@@ -47,8 +47,10 @@ def activation(x, function_type):
         return functions['logistic']
 
 
-def summing_junction(neuron, inputs, bias):
-    return sum([inputs[i] * neuron['weights'][i] for i in range(len(neuron['weights'])-1)]) + bias
+def summing_junction(neuron, inputs):
+    bias = neuron['weights'][-1]
+    neuron_count = len(neuron['weights'])-1
+    return sum([inputs[i] * neuron['weights'][i] for i in range(neuron_count)]) + bias
 
 
 def neuron_output(layer, inputs, activation_func, regression, output_layer):
@@ -62,12 +64,11 @@ def neuron_output(layer, inputs, activation_func, regression, output_layer):
 
     outputs = list()
     for i, neuron in enumerate(layer):
-        bias = neuron['weights'][-1]
-        lin_response = summing_junction(neuron, inputs, bias)
+        linear_response = summing_junction(neuron, inputs)
         if regression and output_layer:
-            output = lin_response
+            output = linear_response
         else:
-            output = activation(lin_response, activation_func)
+            output = activation(linear_response, activation_func)
         neuron['output'] = output
         outputs.append(output)
     return outputs
@@ -110,23 +111,22 @@ def backpropagate(network, desired_outputs, activation_func, regression):
     #    desired _outputs: learning target as list.
     #    activation_func: activation function as string
 
-    for i in reversed(range(len(network))):
+    n_layers = len(network)
+    for i in reversed(range(n_layers)):
         layer = network[i]
         costs = list()
-        if i != len(network) - 1:
+        output_layer_ix = n_layers - 1
+        if i != output_layer_ix:
             for j in range(len(layer)):
-                cost = 0.0
                 outer_layer = network[i + 1]
-                for neuron in outer_layer:
-                    cost += (neuron['weights'][j] * neuron['delta'])
+                cost = sum([neuron['weights'][j] * neuron['delta'] for neuron in outer_layer])
                 costs.append(cost)
-
         else:
             for desired_output, neuron in zip(desired_outputs, layer):
                 cost = desired_output - neuron['output']
                 costs.append(cost)
         for neuron, cost in zip(layer, costs):
-            if regression and i == len(network) - 1:
+            if regression and i == output_layer_ix:
                 neuron['delta'] = cost
             else:
                 neuron['delta'] = cost*derivative_activation(neuron['output'], activation_func)
